@@ -1,117 +1,162 @@
 <?php
-	// Original source: https://github.com/bootstrapbay/contact-form
-	// Original author: https://github.com/cgimmer
 
-	$errName = "";
-	$errEmail = "";
-	$errMessage = "";
-	$errHuman = "";
-	$result = "";
+error_reporting(E_ALL ^ E_NOTICE);
 
-	if (isset($_POST["submit"])) {
-		$name = $_POST['name'];
-		$email = $_POST['email'];
-		$message = $_POST['message'];
-		$human = intval($_POST['human']);
-		$from = 'Demo Contact Form'; 
-		$to = 'example@domain.com'; 
-		$subject = 'Message from Contact Demo ';
-		
-		$body ="From: $name\n E-Mail: $email\n Message:\n $message";
+/*
+95% of this code is from FormToEmail:http://formtoemail.com/FormToEmail.txt
+Thank you for choosing FormToEmail by FormToEmail.com; Version 2.5 April 16th 2009
+---------------------------------------------------------------------------------------------------
+SETUP INSTRUCTIONS
+Step 1: To put the form on your webpage, copy the code below as it is, and paste it into your webpage:
+<form action="thankyou/" method="post">
+<table border="0" style="background:#ececec" cellspacing="5">
+<tr align="left"><td>Name</td><td><input type="text" size="30" name="name"></td></tr>
+<tr align="left"><td>Email address</td><td><input type="text" size="30" name="email"></td></tr>
+<tr align="left"><td valign="top">Comments</td><td><textarea name="comments" rows="6" cols="30"></textarea></td></tr>
+<tr align="left"><td>&nbsp;</td><td><input type="submit" value="Send"></td></tr>
+</table>
+</form>
+Step 2: Enter your email address.
+Enter the email address below to send the contents of the form to.  You can enter more than one email address separated by commas, like so: $my_email = "info@example.com"; or $my_email = "bob@example.com,sales@example.co.uk,jane@example.com";
+*/
 
-		// Check if name has been entered
-		if (!$_POST['name']) {
-			$errName = 'Please enter your name';
-		}
-		
-		// Check if email has been entered and is valid
-		if (!$_POST['email'] || !filter_var($_POST['email'], FILTER_VALIDATE_EMAIL)) {
-			$errEmail = 'Please enter a valid email address';
-		}
-		
-		//Check if message has been entered
-		if (!$_POST['message']) {
-			$errMessage = 'Please enter your message';
-		}
-		//Check if simple anti-bot test is correct
-		if ($human !== 5) {
-			$errHuman = 'Your anti-spam is incorrect';
-		}
+$my_email = "aeyanashraf@gmail.com";
 
-	// If there are no errors, show posted data
-	if (!$errName && !$errEmail) {
-		$result='<div class="alert alert-success">Thank You! I will be in touch</div>';
-		$result = $result . "<div>$name\n</div>";
-		$result = $result . "<div>$email\n</div>";
-		$result = $result . "<div>$message\n</div>";
-		$result = $result . "<div>$human\n</div>";
-	}
-	else {
-		$result='<div class="alert alert-danger">Sorry there was an error sending your message. Please try again later.</div>';
-	}
+/*
+Optional.  Enter a From: email address.  By default, the email you get from the script will show the visitor's email address as the From: address.  In most cases this is desirable.  On the majority of setups this won't be a problem but a minority of hosts insist that the From: address must be from a domain on the server.  
+*/
+$from_email = "";
+
+/* Subject line */
+$subject = "Contact from My personal Site";
+
+/* Site URL */
+$site_url = "https://aeyanashraf.github.io/";
+
+/* Site Name */
+$site_name = "aeyanashraf.github.io";
+
+/* 
+Optional.  Enter the continue link to offer the user after the form is sent.  If you do not change this, your visitor will be given a continue link to your homepage.
+If you do change it, remove the "/" symbol below and replace with the name of the page to link to, eg: "mypage.htm" or "http://www.elsewhere.com/page.htm"
+*/
+$continue = "/";
+
+/*
+Step 3: Save this file (/thankyou/index.php) and upload it together with your webpage containing the form to your webspace.  IMPORTANT - The file name is case sensitive!  You must save it exactly as it is named above!
+*/
+
+$errors = array();
+
+// Remove $_COOKIE elements from $_REQUEST.
+
+if(count($_COOKIE)){foreach(array_keys($_COOKIE) as $value){unset($_REQUEST[$value]);}}
+
+// Validate email field.
+
+if(isset($_REQUEST['email']) && !empty($_REQUEST['email']))
+{
+
+$_REQUEST['email'] = trim($_REQUEST['email']);
+
+if(substr_count($_REQUEST['email'],"@") != 1 || stristr($_REQUEST['email']," ")){$errors[] = "Email address is invalid";}else{$exploded_email = explode("@",$_REQUEST['email']);if(empty($exploded_email[0]) || strlen($exploded_email[0]) > 64 || empty($exploded_email[1])){$errors[] = "Email address is invalid";}else{if(substr_count($exploded_email[1],".") == 0){$errors[] = "Email address is invalid";}else{$exploded_domain = explode(".",$exploded_email[1]);if(in_array("",$exploded_domain)){$errors[] = "Email address is invalid";}else{foreach($exploded_domain as $value){if(strlen($value) > 63 || !preg_match('/^[a-z0-9-]+$/i',$value)){$errors[] = "Email address is invalid"; break;}}}}}}
+
 }
+
+// Check referrer is from same site.
+
+if(!(isset($_SERVER['HTTP_REFERER']) && !empty($_SERVER['HTTP_REFERER']) && stristr($_SERVER['HTTP_REFERER'],$_SERVER['HTTP_HOST']))){$errors[] = "You must enable referrer logging to use the form";}
+
+// Check for a blank form.
+
+function recursive_array_check_blank($element_value)
+{
+
+global $set;
+
+if(!is_array($element_value)){if(!empty($element_value)){$set = 1;}}
+else
+{
+
+foreach($element_value as $value){if($set){break;} recursive_array_check_blank($value);}
+
+}
+
+}
+
+recursive_array_check_blank($_REQUEST);
+
+if(!$set){$errors[] = "You cannot send a blank form";}
+
+unset($set);
+
+// Display any errors and exit if errors exist.
+
+if(count($errors)){foreach($errors as $value){print "$value<br>";} exit;}
+
+if(!defined("PHP_EOL")){define("PHP_EOL", strtoupper(substr(PHP_OS,0,3) == "WIN") ? "\r\n" : "\n");}
+
+// Build message.
+
+function build_message($request_input){if(!isset($message_output)){$message_output ="";}if(!is_array($request_input)){$message_output = $request_input;}else{foreach($request_input as $key => $value){if(!empty($value)){if(!is_numeric($key)){$message_output .= str_replace("_"," ",ucfirst($key)).": ".build_message($value).PHP_EOL.PHP_EOL;}else{$message_output .= build_message($value).", ";}}}}return rtrim($message_output,", ");}
+
+$message = build_message($_REQUEST);
+
+$message = $message . PHP_EOL.PHP_EOL."-- ".PHP_EOL."Thank you for using FormToEmail from http://FormToEmail.com";
+
+$message = stripslashes($message);
+
+$subject = stripslashes($subject);
+
+if($from_email)
+{
+
+$headers = "From: " . $from_email;
+$headers .= PHP_EOL;
+$headers .= "Reply-To: " . $_REQUEST['email'];
+
+}
+else
+{
+
+$from_name = "";
+
+if(isset($_REQUEST['name']) && !empty($_REQUEST['name'])){$from_name = stripslashes($_REQUEST['name']);}
+
+$headers = "From: {$from_name} <{$_REQUEST['email']}>";
+
+}
+
+mail($my_email,$subject,$message,$headers);
+
+/*
+<b>Thank you <?php if(isset($_REQUEST['name'])){print stripslashes($_REQUEST['name']);} ?></b>
+*/
+
 ?>
 
 <!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="Bootstrap contact form with PHP example by BootstrapBay.com.">
-    <meta name="author" content="BootstrapBay.com">
-    <title>Bootstrap Contact Form With PHP Example</title>
-    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.1/css/bootstrap.min.css">
-  </head>
-  <body>
-  	<div class="container">
-  		<div class="row">
-  			<div class="col-md-6 col-md-offset-3">
-  				<h1 class="page-header text-center">Contact Form Example</h1>
-				<form class="form-horizontal" role="form" method="post" action="index.php">
-					<div class="form-group">
-						<label for="name" class="col-sm-2 control-label">Name</label>
-						<div class="col-sm-10">
-							<input type="text" class="form-control" id="name" name="name" placeholder="First & Last Name" value="<?php if(isset($_POST['name'])) echo htmlspecialchars($_POST['name']); ?>">
-							<?php echo "<p class='text-danger'>$errName</p>";?>
-						</div>
-					</div>
-					<div class="form-group">
-						<label for="email" class="col-sm-2 control-label">Email</label>
-						<div class="col-sm-10">
-							<input type="email" class="form-control" id="email" name="email" placeholder="example@domain.com" value="<?php if(isset($_POST['email'])) echo htmlspecialchars($_POST['email']); ?>">
-							<?php echo "<p class='text-danger'>$errEmail</p>";?>
-						</div>
-					</div>
-					<div class="form-group">
-						<label for="message" class="col-sm-2 control-label">Message</label>
-						<div class="col-sm-10">
-							<textarea class="form-control" rows="4" name="message"><?php if(isset($_POST['message'])) echo htmlspecialchars(isset($_POST['message'])); ?></textarea>
-							<?php echo "<p class='text-danger'>$errMessage</p>";?>
-						</div>
-					</div>
-					<div class="form-group">
-						<label for="human" class="col-sm-2 control-label">2 + 3 = ?</label>
-						<div class="col-sm-10">
-							<input type="text" class="form-control" id="human" name="human" placeholder="Your Answer" value="<?php if(isset($_POST['human'])) echo htmlspecialchars($_POST['human']); ?>">
-							<?php echo "<p class='text-danger'>$errHuman</p>";?>
-						</div>
-					</div>
-					<div class="form-group">
-						<div class="col-sm-10 col-sm-offset-2">
-							<input id="submit" name="submit" type="submit" value="Send" class="btn btn-primary">
-						</div>
-					</div>
-					<div class="form-group">
-						<div class="col-sm-10 col-sm-offset-2">
-							<?php echo $result; ?>	
-						</div>
-					</div>
-				</form> 
-			</div>
-		</div>
-	</div>   
-    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.0/jquery.min.js"></script>
-    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.1/js/bootstrap.min.js"></script>
-  </body>
+<html>
+<head>
+	<meta charset="utf-8">
+	<meta http-equiv="refresh" content="5;url=<?php print $site_url; ?>">
+	<title>Thank you for contacting <?php print $site_name; ?></title>
+	<style>
+		body 		{font-family:Arial, sans-serif; font-size:13px;}
+		p 			{line-height:1.5em;}
+		#thankyou 	{margin:200px auto 0px; width:400px; background:#efefef; border:1px solid #ccc; padding:20px;
+					-moz-border-radius: 10px; 
+					-webkit-border-radius: 10px; 
+					border-radius:10px;
+					-webkit-box-shadow: 0px 3px 3px #eee;
+					-moz-box-shadow: 0px 3px 3px #eee;
+					box-shadow: 0px 3px 3px #eee;}
+	</style>
+</head>
+<body>
+	<div id="thankyou">
+		<p><strong>Thank you for contacting us, your message has been sent.</strong></p>
+		<p>If you're not redirected in 5 seconds, then <a href="<?php print $continue; ?>">click here to go to the homepage.</a></p>
+	</div>
+</body>
 </html>
